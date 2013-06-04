@@ -1,2 +1,2 @@
 local_settings.py
-*.py[co]
+*.pyc

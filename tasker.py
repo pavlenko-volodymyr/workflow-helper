@@ -5,10 +5,12 @@ from __future__ import with_statement
 import os
 import sys
 import json
+import re
 from functools import partial
 from pprint import pprint
 
-from requests import get, post
+from requests import get, post, session
+from requests.auth import HTTPBasicAuth
 
 from fabric.api import cd, local
 
@@ -119,10 +121,7 @@ def git_collect_commits_messages(start="upstream/master", end=None):
 
 def git_pull_request():
     branch_name = git_get_branch_name()
-    pull_request_title = (
-        raw_input("Pull request title: ")
-        or git_collect_commits_messages()
-    )
+    pull_request_title = git_collect_commits_messages()
     pull_request_title = ", ".join(
         [branch_name.capitalize(), pull_request_title]
     )
@@ -137,6 +136,7 @@ def git_pull_request():
     url = "".join([GITHUB['urls']['base'], GITHUB['urls']['pull_request']])
     response = post(url=url, data=json.dumps(data))
     if response.status_code != 201:
+        pprint(GITHUB)
         pprint(response)
 
     json_response = json.loads(response.content)
@@ -158,11 +158,10 @@ def test():
     if SETTINGS_ENABLED:
         apps = " ".join(settings.PROJECT_APPS)
         command.append(apps)
-    command.append("; alert 'finished'")
     local(" ".join(command))
 
 
-def new_task(task_number):
+def new_task(task_number, south=False):
     assert task_number, "No task number given"
 
     branch_name = "task-%s" % task_number
@@ -173,16 +172,19 @@ def new_task(task_number):
         git_reset()
         git_new_branch(branch_name)
         git_checkout(branch_name)
-        migrate()
+
+        if south:
+            migrate()
 
 
-def update_task():
+def update_task(south):
     """Should be runned after checkout"""
 
     git_fetch()
     git_rebase()
     # test()
-    migrate()
+    if south:
+        migrate()
 
 
 def reopen_task(task_number):
@@ -195,16 +197,16 @@ def reopen_task(task_number):
         update_task()
 
 
-def switch_to_task(task_number, update=True):
+def switch_to_task(task_number, update=True, south=False):
     assert task_number, "No task number given"
 
     branch_name = "task-%s" % task_number
     with cd(RUN_DIR):
         git_checkout(branch_name)
-        update_task()
+        update_task(south)
 
 
-def finish_task(no_south=False):
+def finish_task(south=False, force=False):
     with cd(RUN_DIR):
         # test()
         git_fetch()
@@ -212,9 +214,53 @@ def finish_task(no_south=False):
 
         branch_name = git_get_branch_name()
 
-        if not no_south:
+        if south:
             # don't be stupid, check migration before send
             migrate()
 
-        git_push(branch_name)
+        git_push(branch_name, force)
         git_pull_request()
+
+
+#Aliases
+ft = finish_task
+nt = new_task
+st = switch_to_task
+
+
+class Tracker(object):
+    URL = 'https://tracker.mymoneypark.com/login'
+    ISSUE = 'https://tracker.mymoneypark.com/issues/{issue_id}'
+    session = None
+
+    def _get_auth_token(self):
+        p = re.compile(r'authenticity_token" type="hidden" value="(.*)"')
+        r = get(url=self.URL, verify=False, auth=HTTPBasicAuth('mmp', '2013_mmp'))
+        # Max in my head
+        assert r.status_code == 200
+        assert p.search(r.content)
+        return p.search(r.content).groups()[0]
+
+    def login(self):
+        token = self._get_auth_token()
+        self.session = session()
+        data = {
+            'utf8': '%E2%9C%93',
+            'authenticity_token': token,
+            'back_url': 'https://tracker.mymoneypark.com/projects/mmp/issues',
+            'username': 'volodymyr.pavlenko',
+            'password': 'P_ssw0rd',
+            'login': 'Login+%C2%BB'
+        }
+        r = self.session.post(url=self.URL, data=data, verify=False, auth=HTTPBasicAuth('mmp', '2013_mmp'))
+
+    def issue_detail(self, issue_id):
+        r = self.session.get(
+            url=self.ISSUE.format(issue_id=issue_id),
+            verify=False, auth=HTTPBasicAuth('mmp', '2013_mmp'))
+        return r.content
+
+if __name__ == "__main__":
+    t = Tracker()
+    t.login()
+    print t.issue_detail()
