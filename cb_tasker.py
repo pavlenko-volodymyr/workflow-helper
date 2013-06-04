@@ -10,7 +10,7 @@ import json
 from fabric.api import task, local, quiet, prompt
 from fabric.colors import red, cyan
 
-from requests import get, post
+from requests import post
 
 from utils import add_class_methods_as_module_level_functions_for_fabric
 
@@ -22,8 +22,6 @@ if not GITHUB_USER or not GITHUB_PASSWORD:
 
 
 class PullRequestMixin(object):
-    post = (lambda self: partial(post, auth=(GITHUB_USER, GITHUB_PASSWORD)))()
-
     GITHUB = {
         'user': GITHUB_USER,
         'password': GITHUB_PASSWORD,
@@ -32,6 +30,10 @@ class PullRequestMixin(object):
             'pull_request': '/repos/django-stars/mmp/pulls'
         }
     }
+
+    def post(self, *args, **kwargs):
+        kwargs.update({'auth': (GITHUB_USER, GITHUB_PASSWORD)})
+        return post(*args, **kwargs)
 
     def send(self):
         message = prompt("Pull request message, either joined commit's messages will be used",

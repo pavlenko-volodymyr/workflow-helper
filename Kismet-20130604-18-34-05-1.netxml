@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE detection-run SYSTEM "http://kismetwireless.net/kismet-3.1.0.dtd">
+
+<detection-run kismet-version="2011.03.R2" start-time="Tue Jun  4 18:34:05 2013">
+
+<card-source uuid="4e214a36-cd2c-11e2-82f1-90039a11e201">
+ <card-source>wlan0:name=wifi,</card-source>
+ <card-name>wifi</card-name>
+ <card-interface>wlan0</card-interface>
+ <card-type>ath9k</card-type>
+ <card-packets>0</card-packets>
+ <card-hop>true</card-hop>
+ <card-channels>1,5,9,13,2,6,10,3,7,11,4,8,12</card-channels>
+</card-source>
+</detection-run>
